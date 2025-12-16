@@ -326,6 +326,12 @@ function initSimulation() {
     // 첫 입금(초기자금) 처리
     buyStock(stockData[0].close, portfolio.cash, "💰 초기 거치금 투자");
     portfolio.cash = 0; // 전액 매수 가정
+    
+    // 첫 거래일의 월/주를 기록하여 중복 입금 방지
+    const firstDay = stockData[0].dateObj;
+    portfolio.lastDepositMonth = firstDay.getMonth();
+    portfolio.lastDepositWeek = getWeekNumber(firstDay);
+    currentIndex = 1; // 첫 날은 이미 처리했으므로 1부터 시작
 
     // 루프 시작
     runLoop();
@@ -575,22 +581,92 @@ function processDayFast(dayData) {
     }
 }
 
-// 차트 재구성 (빠른 점프 후 사용)
+// 차트 재구성 (빠른 점프 후 사용) - 실제 시뮬레이션을 다시 돌려서 데이터 수집
 function rebuildChart() {
     initChart();
     
-    // 현재까지의 데이터로 차트 포인트 생성 (간격을 두고)
-    const step = Math.max(1, Math.floor(currentIndex / 100));
-    for (let i = 0; i < currentIndex; i += step) {
-        const d = stockData[i];
-        const val = portfolio.shares * d.close;
-        // 해당 시점의 투자금 추정 (현재 투자금 기준 비례)
-        const investedAtPoint = portfolio.totalInvested * (i / currentIndex);
-        chartInstance.data.labels.push(d.dateStr);
-        chartInstance.data.datasets[0].data.push(val);
-        chartInstance.data.datasets[1].data.push(investedAtPoint);
+    // 현재 포트폴리오 상태 저장
+    const savedPortfolio = { ...portfolio };
+    const savedIndex = currentIndex;
+    
+    // 포트폴리오 초기화 (차트 데이터 수집용)
+    const startYear = parseInt(els.startDate.value.split('-')[0]) || 2010;
+    const defaultAmount = parseFloat(els.regularDeposit.value) || 1000;
+    const initialCash = parseFloat(els.initialDeposit.value);
+    
+    // 첫 거래일 정보로 초기화 (중복 입금 방지)
+    const firstDay = stockData[0].dateObj;
+    let tempPortfolio = {
+        shares: initialCash / stockData[0].close,
+        totalInvested: initialCash,
+        currentDepositAmount: yearlyDeposits[startYear] || defaultAmount,
+        lastDepositMonth: firstDay.getMonth(),
+        lastDepositWeek: getWeekNumber(firstDay)
+    };
+    
+    // 차트 포인트 간격: 일반 시뮬레이션과 동일하게 5일 간격 사용
+    const step = 5;
+    
+    // 처음부터 다시 계산하면서 차트 데이터 수집 (첫 날은 초기 거치금으로 처리됨)
+    for (let i = 1; i < savedIndex; i++) {
+        const dayData = stockData[i];
+        const price = dayData.close;
+        const currentYear = dayData.dateObj.getFullYear();
+        
+        // 배당금 처리
+        if (dayData.dividend > 0) {
+            const divTotal = tempPortfolio.shares * dayData.dividend;
+            if (divTotal > 0 && price > 0) {
+                tempPortfolio.shares += divTotal / price;
+            }
+        }
+        
+        // 년도별 입금액 설정 적용
+        if (yearlyDeposits[currentYear] !== undefined) {
+            tempPortfolio.currentDepositAmount = yearlyDeposits[currentYear];
+        }
+        
+        // 정기 입금 및 매수
+        let shouldDeposit = false;
+        const freq = els.frequency.value;
+        
+        if (freq === 'monthly') {
+            const thisMonth = dayData.dateObj.getMonth();
+            if (thisMonth !== tempPortfolio.lastDepositMonth) {
+                shouldDeposit = true;
+                tempPortfolio.lastDepositMonth = thisMonth;
+            }
+        } else if (freq === 'weekly') {
+            const thisWeek = getWeekNumber(dayData.dateObj);
+            if (dayData.dateObj.getDay() === 1 && thisWeek !== tempPortfolio.lastDepositWeek) {
+                shouldDeposit = true;
+                tempPortfolio.lastDepositWeek = thisWeek;
+            }
+        }
+        
+        if (shouldDeposit && tempPortfolio.currentDepositAmount > 0 && price > 0) {
+            tempPortfolio.totalInvested += tempPortfolio.currentDepositAmount;
+            tempPortfolio.shares += tempPortfolio.currentDepositAmount / price;
+        }
+        
+        // 차트 포인트 추가 (일반 시뮬레이션과 동일하게 5일 간격)
+        if (i % step === 0) {
+            const val = tempPortfolio.shares * price;
+            chartInstance.data.labels.push(dayData.dateStr);
+            chartInstance.data.datasets[0].data.push(val);
+            chartInstance.data.datasets[1].data.push(tempPortfolio.totalInvested);
+        }
     }
+    
     chartInstance.update();
+    
+    // 저장했던 포트폴리오 상태 복원
+    portfolio.shares = savedPortfolio.shares;
+    portfolio.totalInvested = savedPortfolio.totalInvested;
+    portfolio.currentDepositAmount = savedPortfolio.currentDepositAmount;
+    portfolio.lastDepositMonth = savedPortfolio.lastDepositMonth;
+    portfolio.lastDepositWeek = savedPortfolio.lastDepositWeek;
+    currentIndex = savedIndex;
 }
 
 // --- 7. 컨트롤 버튼 이벤트 ---
@@ -645,8 +721,16 @@ els.jumpBtn.addEventListener('click', () => {
     // 시뮬레이션 재시작 후 해당 지점까지 빠르게 진행 (로그 유지)
     resetPortfolioState(true, targetDate);
     currentIndex = 0;
+    
+    // 초기 거치금 투자
     buyStock(stockData[0].close, portfolio.cash, null);
     portfolio.cash = 0;
+    
+    // 첫 거래일의 월/주를 기록하여 중복 입금 방지
+    const firstDay = stockData[0].dateObj;
+    portfolio.lastDepositMonth = firstDay.getMonth();
+    portfolio.lastDepositWeek = getWeekNumber(firstDay);
+    currentIndex = 1; // 첫 날은 이미 처리했으므로 1부터 시작
     
     // 목표 지점까지 빠르게 계산 (차트 업데이트 없이)
     while (currentIndex < targetIdx) {
@@ -743,6 +827,12 @@ document.addEventListener('keydown', (e) => {
             currentIndex = 0;
             buyStock(stockData[0].close, portfolio.cash, null);
             portfolio.cash = 0;
+            
+            // 첫 거래일의 월/주를 기록하여 중복 입금 방지
+            const firstDay = stockData[0].dateObj;
+            portfolio.lastDepositMonth = firstDay.getMonth();
+            portfolio.lastDepositWeek = getWeekNumber(firstDay);
+            currentIndex = 1; // 첫 날은 이미 처리했으므로 1부터 시작
             
             while (currentIndex < targetIdx) {
                 processDayFast(stockData[currentIndex]);
