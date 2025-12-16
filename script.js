@@ -627,14 +627,12 @@ els.jumpBtn.addEventListener('click', () => {
     els.pauseBtn.disabled = false;
     els.simDate.classList.remove('ended');
     
-    // 현재 위치보다 앞으로 가는 경우, 처음부터 다시 계산해야 함
-    if (targetIdx < currentIndex) {
-        // 시뮬레이션 재시작 후 해당 지점까지 빠르게 진행 (로그 유지)
-        resetPortfolioState(true, targetDate);
-        currentIndex = 0;
-        buyStock(stockData[0].close, portfolio.cash, null);
-        portfolio.cash = 0;
-    }
+    // 항상 처음부터 다시 계산해야 투자 원금이 정확함
+    // 시뮬레이션 재시작 후 해당 지점까지 빠르게 진행 (로그 유지)
+    resetPortfolioState(true, targetDate);
+    currentIndex = 0;
+    buyStock(stockData[0].close, portfolio.cash, null);
+    portfolio.cash = 0;
     
     // 목표 지점까지 빠르게 계산 (차트 업데이트 없이)
     while (currentIndex < targetIdx) {
@@ -708,6 +706,11 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') {
         // 오른쪽: 다음 날로
         if (currentIndex < stockData.length - 1) {
+            // 종료 상태 초기화
+            els.pauseBtn.disabled = false;
+            els.simDate.classList.remove('ended');
+            els.pauseBtn.textContent = "재개";
+            
             processDay(stockData[currentIndex]);
             currentIndex++;
             updateUI(stockData[currentIndex]);
@@ -715,6 +718,11 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'ArrowLeft') {
         // 왼쪽: 이전 날로 (재계산 필요)
         if (currentIndex > 1) {
+            // 종료 상태 초기화
+            els.pauseBtn.disabled = false;
+            els.simDate.classList.remove('ended');
+            els.pauseBtn.textContent = "재개";
+            
             const targetIdx = currentIndex - 1;
             const targetDate = stockData[targetIdx].dateStr;
             resetPortfolioState(true, targetDate);
