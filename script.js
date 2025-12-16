@@ -11,6 +11,16 @@ let tickerDataRanges = {};
 // 년도별 입금액 설정
 let yearlyDeposits = {};
 
+// 주 번호 계산 헬퍼 함수 (년도 + 주차를 고유하게 식별)
+function getWeekNumber(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return d.getUTCFullYear() * 100 + weekNo; // 년도*100 + 주차로 고유값 생성
+}
+
 // 역사적 사건 데이터
 const historicalEvents = {
     '2000-03-10': '🔴 닷컴버블 정점',
@@ -406,9 +416,11 @@ function processDay(dayData) {
             portfolio.lastDepositMonth = thisMonth;
         }
     } else if (freq === 'weekly') {
-        // 월요일(1)이면 매수
-        if (dayData.dateObj.getDay() === 1) {
+        // 월요일(1)이면 매수 - 단, 같은 주에 중복 매수 방지
+        const thisWeek = getWeekNumber(dayData.dateObj);
+        if (dayData.dateObj.getDay() === 1 && thisWeek !== portfolio.lastDepositWeek) {
             shouldDeposit = true;
+            portfolio.lastDepositWeek = thisWeek;
         }
     }
 
@@ -550,8 +562,10 @@ function processDayFast(dayData) {
             portfolio.lastDepositMonth = thisMonth;
         }
     } else if (freq === 'weekly') {
-        if (dayData.dateObj.getDay() === 1) {
+        const thisWeek = getWeekNumber(dayData.dateObj);
+        if (dayData.dateObj.getDay() === 1 && thisWeek !== portfolio.lastDepositWeek) {
             shouldDeposit = true;
+            portfolio.lastDepositWeek = thisWeek;
         }
     }
 
