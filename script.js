@@ -381,9 +381,8 @@ function processDay(dayData) {
     }
     
     // A. 액면분할 체크
-    // 주의: yfinance에서 다운로드한 데이터는 이미 분할이 소급 적용되어 있음
-    // 따라서 Close 가격은 이미 분할 조정된 가격이므로, shares를 조정할 필요 없음
-    // 단, 로그만 남겨서 사용자에게 분할 이벤트를 알림
+    // 주의: yfinance에서 다운로드한 데이터는 이미 분할이 소급 적용되어 있을 수 있음
+    // 이 코드는 "Close가 이미 split-adjusted"라는 전제를 유지: shares 조정하지 않음(로그만)
     if (dayData.split > 0 && dayData.split !== 1) {
         addLog(`✂️ 액면분할 발생 (${dayData.split}:1) - 가격에 이미 반영됨`);
     }
@@ -422,9 +421,9 @@ function processDay(dayData) {
             portfolio.lastDepositMonth = thisMonth;
         }
     } else if (freq === 'weekly') {
-        // 월요일(1)이면 매수 - 단, 같은 주에 중복 매수 방지
+        // [FIX A] "월요일일 때만"이 아니라 "주가 바뀐 첫 거래일"에 매수
         const thisWeek = getWeekNumber(dayData.dateObj);
-        if (dayData.dateObj.getDay() === 1 && thisWeek !== portfolio.lastDepositWeek) {
+        if (thisWeek !== portfolio.lastDepositWeek) {
             shouldDeposit = true;
             portfolio.lastDepositWeek = thisWeek;
         }
@@ -444,9 +443,9 @@ function buyStock(price, amount, logMsg) {
     const count = amount / price;
     portfolio.shares += count;
     // 소수점 4자리까지만 표시해서 로그 남김
-    if(logMsg) {
-        // 너무 잦은 로그 방지 (정기 입금은 로그 안남기거나 간략하게)
-        // 여기선 다 남기되 UI에서 최신순으로 보여줌
+    if (logMsg) {
+        // 현재는 로그 메시지 파라미터만 받고 실제 매수 로그를 남기진 않는 구조
+        // 필요하면 여기서 addLog 호출 추가 가능
     }
 }
 
@@ -568,8 +567,9 @@ function processDayFast(dayData) {
             portfolio.lastDepositMonth = thisMonth;
         }
     } else if (freq === 'weekly') {
+        // [FIX A] 주가 바뀌면(그 주 첫 거래일) 매수
         const thisWeek = getWeekNumber(dayData.dateObj);
-        if (dayData.dateObj.getDay() === 1 && thisWeek !== portfolio.lastDepositWeek) {
+        if (thisWeek !== portfolio.lastDepositWeek) {
             shouldDeposit = true;
             portfolio.lastDepositWeek = thisWeek;
         }
@@ -637,8 +637,9 @@ function rebuildChart() {
                 tempPortfolio.lastDepositMonth = thisMonth;
             }
         } else if (freq === 'weekly') {
+            // [FIX A] 주가 바뀌면(그 주 첫 거래일) 매수
             const thisWeek = getWeekNumber(dayData.dateObj);
-            if (dayData.dateObj.getDay() === 1 && thisWeek !== tempPortfolio.lastDepositWeek) {
+            if (thisWeek !== tempPortfolio.lastDepositWeek) {
                 shouldDeposit = true;
                 tempPortfolio.lastDepositWeek = thisWeek;
             }
@@ -811,7 +812,10 @@ document.addEventListener('keydown', (e) => {
             
             processDay(stockData[currentIndex]);
             currentIndex++;
-            updateUI(stockData[currentIndex]);
+
+            // [FIX C] processDay 내부에서 updateUI(dayData)를 이미 호출함.
+            // 여기서 다음날 데이터로 updateUI를 다시 호출하면 UI/포트폴리오가 꼬일 수 있으므로 제거.
+            // updateUI(stockData[currentIndex]); // 제거됨
         }
     } else if (e.key === 'ArrowLeft') {
         // 왼쪽: 이전 날로 (재계산 필요)
