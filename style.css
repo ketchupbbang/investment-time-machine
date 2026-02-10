@@ -319,19 +319,58 @@ button:disabled {
 
 /* Custom Ticker Input */
 .custom-ticker-area {
+    margin-top: 10px;
+}
+
+.custom-ticker-row {
     display: flex;
+    gap: 10px;
+}
+
+.custom-ticker-row input {
+    flex: 1;
+}
+
+.custom-ticker-row button {
+    width: auto;
+    padding: 10px 15px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.csv-upload-row {
+    display: flex;
+    align-items: center;
     gap: 10px;
     margin-top: 10px;
 }
 
-.custom-ticker-area input {
-    flex: 1;
+.upload-label {
+    font-size: 12px;
+    color: var(--text-sub);
+    white-space: nowrap;
 }
 
-.custom-ticker-area button {
-    width: auto;
-    padding: 10px 15px;
-    font-size: 14px;
+.file-upload-btn {
+    display: inline-block;
+    padding: 6px 12px;
+    font-size: 12px;
+    background: #2a2e39;
+    border: 1px solid #3e424d;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.file-upload-btn:hover {
+    background: #3a3e49;
+}
+
+.csv-file-name {
+    font-size: 12px;
+    color: var(--accent-green);
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 

@@ -32,8 +32,18 @@
                         <option value="__custom__">✏️ 직접 입력...</option>
                     </select>
                     <div id="customTickerArea" class="custom-ticker-area hidden">
-                        <input type="text" id="customTickerInput" placeholder="티커 심볼 입력 (예: AAPL, MSFT)">
-                        <button type="button" id="fetchTickerBtn">📥 데이터 받아오기</button>
+                        <div class="custom-ticker-row">
+                            <input type="text" id="customTickerInput" placeholder="티커 심볼 입력 (예: AAPL, MSFT)">
+                            <button type="button" id="fetchTickerBtn">📥 받아오기</button>
+                        </div>
+                        <div class="csv-upload-row">
+                            <span class="upload-label">또는 yfinance CSV 업로드:</span>
+                            <label class="file-upload-btn">
+                                📂 파일 선택
+                                <input type="file" id="csvFileInput" accept=".csv" hidden>
+                            </label>
+                            <span id="csvFileName" class="csv-file-name"></span>
+                        </div>
                     </div>
                     <div id="savedTickerActions" class="saved-ticker-actions hidden">
                         <span id="savedTickerInfo" class="saved-ticker-info"></span>

@@ -132,6 +132,8 @@ const els = {
     customTickerArea: document.getElementById('customTickerArea'),
     customTickerInput: document.getElementById('customTickerInput'),
     fetchTickerBtn: document.getElementById('fetchTickerBtn'),
+    csvFileInput: document.getElementById('csvFileInput'),
+    csvFileName: document.getElementById('csvFileName'),
     tickerFetchStatus: document.getElementById('tickerFetchStatus'),
     savedTickerActions: document.getElementById('savedTickerActions'),
     savedTickerInfo: document.getElementById('savedTickerInfo'),
@@ -349,6 +351,71 @@ els.customTickerInput.addEventListener('keypress', (e) => {
     }
 });
 
+// --- CSV 파일 업로드로 데이터 로드 ---
+els.csvFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    els.csvFileName.textContent = file.name;
+    
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+        const csvData = evt.target.result;
+        
+        try {
+            // CSV 유효성 검사
+            const lines = csvData.trim().split('\n');
+            const headers = lines[0].split(',');
+            const idxDate = headers.findIndex(h => h.includes('Date'));
+            const idxClose = headers.findIndex(h => h.includes('Close'));
+            
+            if (idxDate === -1 || idxClose === -1 || lines.length < 10) {
+                throw new Error('yfinance CSV 형식이 아닙니다. Date, Close 컬럼이 필요합니다.');
+            }
+            
+            const firstDate = lines[1].split(',')[idxDate];
+            const lastDate = lines[lines.length - 1].split(',')[idxDate];
+            
+            // 티커명 추출 (파일명에서 or 입력란에서)
+            let ticker = els.customTickerInput.value.trim().toUpperCase();
+            if (!ticker) {
+                ticker = file.name.replace(/\.csv$/i, '').toUpperCase();
+                els.customTickerInput.value = ticker;
+            }
+            
+            customTickerCSV = csvData;
+            tickerDataRanges['__custom__'] = { minDate: firstDate, maxDate: lastDate };
+            
+            els.tickerDateInfo.textContent = `📅 데이터 기간: ${firstDate} ~ ${lastDate}`;
+            els.startDate.value = firstDate;
+            els.endDate.value = lastDate;
+            
+            els.tickerFetchStatus.classList.remove('hidden');
+            els.tickerFetchStatus.textContent = `✅ ${ticker} CSV 로드 완료! (${lines.length - 1}일치)`;
+            els.tickerFetchStatus.className = 'ticker-fetch-status fetch-success';
+            
+            // localStorage에 저장
+            saveTickerToStorage(ticker, csvData);
+            populateSavedTickers();
+            
+            // 저장된 티커로 자동 전환
+            els.tickerSelect.value = `__saved__${ticker}`;
+            els.customTickerArea.classList.add('hidden');
+            els.savedTickerActions.classList.remove('hidden');
+            const savedList = getSavedTickerList();
+            const entry = savedList.find(t => t.symbol === ticker);
+            if (entry) {
+                els.savedTickerInfo.textContent = `마지막 업데이트: ${entry.updatedAt}`;
+            }
+        } catch (err) {
+            els.tickerFetchStatus.classList.remove('hidden');
+            els.tickerFetchStatus.textContent = `❌ CSV 파싱 실패: ${err.message}`;
+            els.tickerFetchStatus.className = 'ticker-fetch-status fetch-error';
+        }
+    };
+    reader.readAsText(file);
+});
+
 // --- 저장된 티커 업데이트/삭제 ---
 els.updateTickerBtn.addEventListener('click', async () => {
     const val = els.tickerSelect.value;
@@ -407,35 +474,55 @@ els.deleteTickerBtn.addEventListener('click', () => {
 async function fetchTickerFromYahoo(ticker) {
     const endTime = Math.floor(Date.now() / 1000);
     const startTime = 0;
-    const yahooUrl = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${startTime}&period2=${endTime}&interval=1d&events=div%7Csplit`;
+    
+    // query1/query2 모두 시도
+    const yahooUrls = [
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${startTime}&period2=${endTime}&interval=1d&events=div%7Csplit`,
+        `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${startTime}&period2=${endTime}&interval=1d&events=div%7Csplit`
+    ];
+    
+    // CORS 프록시 목록 (여러 개 시도)
+    const corsProxies = [
+        url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+        url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+        url => `https://corsproxy.org/?${encodeURIComponent(url)}`,
+    ];
     
     let data = null;
-    let lastError = null;
     
-    // 1) 직접 요청
-    try {
-        const resp = await fetch(yahooUrl);
-        if (resp.ok) data = await resp.json();
-    } catch (e) { lastError = e; }
-    
-    // 2) CORS 프록시 1
-    if (!data) {
+    // 1) 직접 요청 (CORS 허용 시)
+    for (const yahooUrl of yahooUrls) {
+        if (data) break;
         try {
-            const resp = await fetch(`https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`);
-            if (resp.ok) data = await resp.json();
-        } catch (e) { lastError = e; }
+            const resp = await fetch(yahooUrl);
+            if (resp.ok) {
+                const json = await resp.json();
+                if (json?.chart?.result) { data = json; break; }
+            }
+        } catch (e) { /* CORS block expected */ }
     }
     
-    // 3) CORS 프록시 2
+    // 2) CORS 프록시로 시도
     if (!data) {
-        try {
-            const resp = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`);
-            if (resp.ok) data = await resp.json();
-        } catch (e) { lastError = e; }
+        for (const makeProxy of corsProxies) {
+            if (data) break;
+            for (const yahooUrl of yahooUrls) {
+                if (data) break;
+                try {
+                    const proxyUrl = makeProxy(yahooUrl);
+                    const resp = await fetch(proxyUrl);
+                    if (resp.ok) {
+                        const json = await resp.json();
+                        if (json?.chart?.result) { data = json; break; }
+                    }
+                } catch (e) { /* proxy failed */ }
+            }
+        }
     }
     
     if (!data || !data.chart || !data.chart.result) {
-        throw new Error(`데이터를 가져올 수 없습니다. 티커(${ticker})를 확인해주세요.`);
+        throw new Error(`Yahoo Finance 데이터를 가져올 수 없습니다. CSV 파일을 직접 업로드해주세요.`);
     }
     
     if (data.chart.error) {
