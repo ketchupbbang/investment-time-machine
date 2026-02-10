@@ -137,6 +137,7 @@ const els = {
     fetchTickerBtn: document.getElementById('fetchTickerBtn'),
     csvFileInput: document.getElementById('csvFileInput'),
     csvFileName: document.getElementById('csvFileName'),
+    yahooFinanceLink: document.getElementById('yahooFinanceLink'),
     tickerFetchStatus: document.getElementById('tickerFetchStatus'),
     savedTickerActions: document.getElementById('savedTickerActions'),
     savedTickerInfo: document.getElementById('savedTickerInfo'),
@@ -345,12 +346,17 @@ els.fetchTickerBtn.addEventListener('click', async () => {
             els.savedTickerInfo.textContent = `마지막 업데이트: ${entry.updatedAt}`;
         }
     } catch (err) {
-        els.tickerFetchStatus.textContent = `❌ 실패: ${err.message}`;
+        els.tickerFetchStatus.textContent = `❌ ${err.message}`;
         els.tickerFetchStatus.className = 'ticker-fetch-status fetch-error';
         customTickerCSV = null;
+        // Yahoo Finance 링크를 해당 티커로 업데이트
+        const t = els.customTickerInput.value.trim().toUpperCase();
+        if (t && els.yahooFinanceLink) {
+            els.yahooFinanceLink.href = `https://finance.yahoo.com/quote/${encodeURIComponent(t)}/history/`;
+        }
     } finally {
         els.fetchTickerBtn.disabled = false;
-        els.fetchTickerBtn.textContent = '📥 데이터 받아오기';
+        els.fetchTickerBtn.textContent = '📥 자동 받아오기';
     }
 });
 
@@ -358,6 +364,14 @@ els.fetchTickerBtn.addEventListener('click', async () => {
 els.customTickerInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         els.fetchTickerBtn.click();
+    }
+});
+
+// 티커 입력 시 Yahoo Finance 링크 자동 업데이트
+els.customTickerInput.addEventListener('input', () => {
+    const t = els.customTickerInput.value.trim().toUpperCase();
+    if (t && els.yahooFinanceLink) {
+        els.yahooFinanceLink.href = `https://finance.yahoo.com/quote/${encodeURIComponent(t)}/history/`;
     }
 });
 
@@ -532,7 +546,7 @@ async function fetchTickerFromYahoo(ticker) {
     }
     
     if (!data || !data.chart || !data.chart.result) {
-        throw new Error(`Yahoo Finance 데이터를 가져올 수 없습니다. CSV 파일을 직접 업로드해주세요.`);
+        throw new Error(`자동 받아오기 실패 — 아래 Yahoo Finance에서 직접 다운로드 후 업로드해주세요.`);
     }
     
     if (data.chart.error) {

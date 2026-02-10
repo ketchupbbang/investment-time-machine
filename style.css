@@ -374,6 +374,51 @@ button:disabled {
     white-space: nowrap;
 }
 
+/* Manual Download Section */
+.manual-download-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed #3e424d;
+}
+
+.manual-label {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: var(--text-sub);
+}
+
+.manual-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.manual-arrow {
+    color: var(--text-sub);
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.yahoo-btn {
+    background: rgba(106, 27, 154, 0.3) !important;
+    border-color: #7c4dff !important;
+    color: #b388ff !important;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+.yahoo-btn:hover {
+    background: rgba(106, 27, 154, 0.5) !important;
+}
+
+.manual-hint {
+    margin: 8px 0 0 0;
+    font-size: 11px;
+    color: #777;
+    font-style: italic;
+}
+
 /* Ticker Fetch Status */
 .ticker-fetch-status {
     margin-top: 8px;
