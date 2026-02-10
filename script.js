@@ -10,9 +10,39 @@ let tickerDataRanges = {};
 // race condition 방지
 let tickerInfoUpdateId = 0;
 
-// 커스텀 티커 CSV 데이터 (인메모리)
+// 커스텀 티커 CSV 데이터 (인메모리 + localStorage 캐시)
 let customTickerCSV = null;
 let customTickerSymbol = '';
+
+// --- localStorage 캐시 헬퍼 ---
+function saveToCacheStorage(ticker, csvData) {
+    try {
+        const key = `ticker_csv_${ticker.toUpperCase()}`;
+        localStorage.setItem(key, csvData);
+        localStorage.setItem(`${key}_ts`, Date.now().toString());
+    } catch (e) {
+        console.warn('localStorage 저장 실패:', e);
+    }
+}
+
+function loadFromCacheStorage(ticker) {
+    try {
+        const key = `ticker_csv_${ticker.toUpperCase()}`;
+        return localStorage.getItem(key);
+    } catch (e) {
+        return null;
+    }
+}
+
+function getCacheTimestamp(ticker) {
+    try {
+        const key = `ticker_csv_${ticker.toUpperCase()}_ts`;
+        const ts = localStorage.getItem(key);
+        return ts ? parseInt(ts) : null;
+    } catch (e) {
+        return null;
+    }
+}
 
 // 역사적 사건 데이터 (CSV에서 로드)
 let historicalEvents = {};
@@ -80,6 +110,8 @@ const els = {
     fetchTickerBtn: document.getElementById('fetchTickerBtn'),
     tickerFetchStatus: document.getElementById('tickerFetchStatus'),
     ghPagesNotice: document.getElementById('ghPagesNotice'),
+    csvDownloadArea: document.getElementById('csvDownloadArea'),
+    downloadCsvBtn: document.getElementById('downloadCsvBtn'),
 
     // 시뮬레이션 출력
     displayTicker: document.getElementById('displayTicker'),
@@ -196,6 +228,7 @@ els.tickerSelect.addEventListener('change', () => {
     els.customTickerArea.classList.add('hidden');
     els.tickerFetchStatus.classList.add('hidden');
     els.ghPagesNotice.classList.add('hidden');
+    els.csvDownloadArea.classList.add('hidden');
 
     if (val === '__custom__') {
         els.customTickerArea.classList.remove('hidden');
@@ -234,7 +267,19 @@ els.fetchTickerBtn.addEventListener('click', async () => {
             source = 'yahoo';
         } catch (e) { /* Yahoo 실패 → 폴백 */ }
 
-        // 2단계: Yahoo 실패 시 stock_data/ 폴더에서 기존 데이터 폴백
+        // 2단계: Yahoo 실패 시 localStorage 캐시 확인
+        if (!csvData) {
+            const cached = loadFromCacheStorage(ticker);
+            if (cached) {
+                const lines = cached.trim().split('\n');
+                if (lines.length >= 10) {
+                    csvData = cached;
+                    source = 'cache';
+                }
+            }
+        }
+
+        // 3단계: 캐시도 없으면 stock_data/ 폴더에서 기존 데이터 폴백
         if (!csvData) {
             try {
                 const resp = await fetch(`./stock_data/${ticker}.csv`);
@@ -254,6 +299,9 @@ els.fetchTickerBtn.addEventListener('click', async () => {
         customTickerCSV = csvData;
         customTickerSymbol = ticker;
 
+        // localStorage에 캐시 저장
+        saveToCacheStorage(ticker, csvData);
+
         const lines = csvData.trim().split('\n');
         const headers = lines[0].split(',');
         const idxDate = headers.findIndex(h => h.includes('Date'));
@@ -266,12 +314,22 @@ els.fetchTickerBtn.addEventListener('click', async () => {
         els.startDate.value = firstDate;
         els.endDate.value = lastDate;
 
-        els.tickerFetchStatus.textContent = `✅ ${ticker} 데이터 로드 완료! (${lines.length - 1}일치${source === 'local' ? ' · 기존 데이터' : ' · Yahoo Finance'})`;
+        // CSV 다운로드 버튼 표시 (Yahoo에서 가져온 경우에만)
+        if (source === 'yahoo') {
+            els.csvDownloadArea.classList.remove('hidden');
+            els.downloadCsvBtn.onclick = () => downloadCSV(ticker, csvData);
+        } else {
+            els.csvDownloadArea.classList.add('hidden');
+        }
+
+        const sourceLabel = source === 'local' ? '기존 데이터' : source === 'cache' ? '캐시 데이터' : 'Yahoo Finance';
+        els.tickerFetchStatus.textContent = `✅ ${ticker} 데이터 로드 완료! (${lines.length - 1}일치 · ${sourceLabel})`;
         els.tickerFetchStatus.className = 'ticker-fetch-status fetch-success';
 
     } catch (err) {
         els.tickerFetchStatus.textContent = `❌ ${err.message}`;
         els.tickerFetchStatus.className = 'ticker-fetch-status fetch-error';
+        els.csvDownloadArea.classList.add('hidden');
         customTickerCSV = null;
         customTickerSymbol = '';
     } finally {
@@ -279,6 +337,17 @@ els.fetchTickerBtn.addEventListener('click', async () => {
         els.fetchTickerBtn.textContent = '📥 데이터 불러오기';
     }
 });
+
+// CSV 다운로드 함수
+function downloadCSV(ticker, csvData) {
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ticker}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
 
 // 엔터키로도 불러오기
 els.customTickerInput.addEventListener('keypress', (e) => {
@@ -474,9 +543,15 @@ els.startBtn.addEventListener('click', async () => {
             }
             csvText = customTickerCSV;
         } else {
-            const response = await fetch(`./stock_data/${ticker}.csv`);
-            if (!response.ok) throw new Error("CSV 파일을 찾을 수 없습니다.");
-            csvText = await response.text();
+            // 기본 티커도 localStorage 캐시 우선 확인
+            const cached = loadFromCacheStorage(ticker);
+            if (cached && cached.trim().split('\n').length >= 10) {
+                csvText = cached;
+            } else {
+                const response = await fetch(`./stock_data/${ticker}.csv`);
+                if (!response.ok) throw new Error("CSV 파일을 찾을 수 없습니다.");
+                csvText = await response.text();
+            }
         }
 
         parseData(csvText);

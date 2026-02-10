@@ -371,6 +371,27 @@ button:disabled {
     background: rgba(255, 61, 0, 0.1) !important;
 }
 
+/* CSV Download Area */
+.csv-download-area {
+    margin-top: 8px;
+}
+
+.download-csv-btn {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+    background: rgba(33, 150, 243, 0.15);
+    color: #64b5f6;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.download-csv-btn:hover {
+    background: rgba(33, 150, 243, 0.25);
+}
+
 /* GitHub Pages Notice */
 .gh-pages-notice {
     margin-top: 10px;
