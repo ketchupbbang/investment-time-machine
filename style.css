@@ -338,85 +338,17 @@ button:disabled {
     white-space: nowrap;
 }
 
-.csv-upload-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.upload-label {
-    font-size: 12px;
-    color: var(--text-sub);
-    white-space: nowrap;
-}
-
-.file-upload-btn {
-    display: inline-block;
-    padding: 6px 12px;
-    font-size: 12px;
-    background: #2a2e39;
-    border: 1px solid #3e424d;
-    border-radius: 6px;
-    color: white;
-    cursor: pointer;
-    white-space: nowrap;
-}
-.file-upload-btn:hover {
-    background: #3a3e49;
-}
-
-.csv-file-name {
-    font-size: 12px;
-    color: var(--accent-green);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Manual Download Section */
-.manual-download-section {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px dashed #3e424d;
-}
-
-.manual-label {
-    margin: 0 0 8px 0;
-    font-size: 13px;
-    color: var(--text-sub);
-}
-
-.manual-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.manual-arrow {
-    color: var(--text-sub);
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.yahoo-btn {
-    background: rgba(106, 27, 154, 0.3) !important;
-    border-color: #7c4dff !important;
-    color: #b388ff !important;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-}
-.yahoo-btn:hover {
-    background: rgba(106, 27, 154, 0.5) !important;
-}
-
-.manual-hint {
+.custom-ticker-hint {
     margin: 8px 0 0 0;
     font-size: 11px;
     color: #777;
-    font-style: italic;
+}
+
+.custom-ticker-hint code {
+    background: rgba(255,255,255,0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
 }
 
 /* Ticker Fetch Status */
@@ -439,29 +371,25 @@ button:disabled {
     background: rgba(255, 61, 0, 0.1) !important;
 }
 
-/* Saved Ticker Actions */
-.saved-ticker-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+/* GitHub Pages Notice */
+.gh-pages-notice {
     margin-top: 10px;
-}
-
-.saved-ticker-info {
+    padding: 12px 14px;
     font-size: 12px;
+    line-height: 1.6;
+    background: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 6px;
+    color: #ffb74d;
+}
+
+.gh-pages-notice code {
+    background: rgba(255,255,255,0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.notice-detail {
     color: var(--text-sub);
-    flex: 1;
-}
-
-.danger-btn {
-    background: rgba(255, 61, 0, 0.2) !important;
-    color: var(--accent-red) !important;
-}
-.danger-btn:hover {
-    background: rgba(255, 61, 0, 0.4) !important;
-}
-
-/* Saved ticker option styling */
-.saved-ticker-option {
-    color: var(--accent-green);
 }
