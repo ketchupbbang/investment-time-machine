@@ -226,20 +226,29 @@ els.fetchTickerBtn.addEventListener('click', async () => {
     els.tickerFetchStatus.className = 'ticker-fetch-status';
 
     try {
-        // 1단계: stock_data/ 폴더에서 먼저 시도
+        // 1단계: Yahoo Finance API로 최신 데이터 시도
         let csvData = null;
+        let source = '';
         try {
-            const resp = await fetch(`./stock_data/${ticker}.csv`);
-            if (resp.ok) {
-                csvData = await resp.text();
-                const lines = csvData.trim().split('\n');
-                if (lines.length < 10) csvData = null; // 너무 작으면 무효
-            }
-        } catch (e) { /* stock_data에 없음 */ }
-
-        // 2단계: stock_data에 없으면 Yahoo Finance API 시도
-        if (!csvData) {
             csvData = await fetchTickerFromYahoo(ticker);
+            source = 'yahoo';
+        } catch (e) { /* Yahoo 실패 → 폴백 */ }
+
+        // 2단계: Yahoo 실패 시 stock_data/ 폴더에서 기존 데이터 폴백
+        if (!csvData) {
+            try {
+                const resp = await fetch(`./stock_data/${ticker}.csv`);
+                if (resp.ok) {
+                    csvData = await resp.text();
+                    const lines = csvData.trim().split('\n');
+                    if (lines.length < 10) csvData = null;
+                    else source = 'local';
+                }
+            } catch (e) { /* stock_data에도 없음 */ }
+        }
+
+        if (!csvData) {
+            throw new Error('데이터를 불러올 수 없습니다. stock_data/ 폴더에 CSV 파일을 직접 넣어주세요.');
         }
 
         customTickerCSV = csvData;
@@ -257,7 +266,7 @@ els.fetchTickerBtn.addEventListener('click', async () => {
         els.startDate.value = firstDate;
         els.endDate.value = lastDate;
 
-        els.tickerFetchStatus.textContent = `✅ ${ticker} 데이터 로드 완료! (${lines.length - 1}일치)`;
+        els.tickerFetchStatus.textContent = `✅ ${ticker} 데이터 로드 완료! (${lines.length - 1}일치${source === 'local' ? ' · 기존 데이터' : ' · Yahoo Finance'})`;
         els.tickerFetchStatus.className = 'ticker-fetch-status fetch-success';
 
     } catch (err) {
