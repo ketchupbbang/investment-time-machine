@@ -8,6 +8,9 @@ let speed = 50;          // ms 단위 (작을수록 빠름)
 // 티커별 데이터 범위 캐시
 let tickerDataRanges = {};
 
+// updateTickerDateInfo race condition 방지용 카운터
+let tickerInfoUpdateId = 0;
+
 // 커스텀 티커 CSV 데이터 캐시
 let customTickerCSV = null;
 
@@ -186,6 +189,7 @@ async function loadTickerDateRange(ticker) {
 
 async function updateTickerDateInfo() {
     const ticker = els.tickerSelect.value;
+    const myUpdateId = ++tickerInfoUpdateId;
     
     if (ticker === '__custom__') {
         if (tickerDataRanges['__custom__']) {
@@ -227,6 +231,9 @@ async function updateTickerDateInfo() {
         tickerDataRanges[ticker] = await loadTickerDateRange(ticker);
     }
     
+    // Race condition 방지: await 사이에 사용자가 다른 티커를 선택했으면 무시
+    if (myUpdateId !== tickerInfoUpdateId) return;
+    
     const range = tickerDataRanges[ticker];
     if (range) {
         els.tickerDateInfo.textContent = `📅 데이터 기간: ${range.minDate} ~ ${range.maxDate}`;
@@ -262,10 +269,10 @@ function populateSavedTickers() {
 }
 
 // 페이지 로드 시 저장된 티커 표시
-populateSavedTickers();
+try { populateSavedTickers(); } catch(e) { console.error('[init] populateSavedTickers 에러:', e); }
 
 // 페이지 로드 시 현재 선택된 티커 정보 표시
-updateTickerDateInfo();
+try { updateTickerDateInfo(); } catch(e) { console.error('[init] updateTickerDateInfo 에러:', e); }
 
 // 티커 변경 시 날짜 범위 업데이트 + 커스텀 티커 표시
 els.tickerSelect.addEventListener('change', () => {
@@ -276,6 +283,9 @@ els.tickerSelect.addEventListener('change', () => {
     els.savedTickerActions.classList.add('hidden');
     els.tickerFetchStatus.classList.add('hidden');
     customTickerCSV = null;
+    
+    // updateTickerDateInfo의 이전 비동기 호출이 이 변경을 덮어쓰지 않도록 카운터 갱신
+    tickerInfoUpdateId++;
     
     if (val === '__custom__') {
         els.customTickerArea.classList.remove('hidden');
