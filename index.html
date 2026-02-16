@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>장기 투자자 시뮬레이터</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="stylesheet" href="style.css?v=6">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>const SCRIPT_VERSION = 6;</script>
+</head>
+<body>
+    <div class="container">
+        <!-- 1. 설정 화면 -->
+        <section id="setup-screen">
+            <h1 class="title">🎢 장기 투자자 체험</h1>
+            <p class="subtitle">과거 시점으로 돌아가 적립식 투자의 등락을 체험해보세요.</p>
+            
+            <div class="card setup-card">
+                <div class="form-group">
+                    <label>체험할 종목</label>
+                    <select id="tickerSelect">
+                        <option value="VOO">VOO (S&P 500 1배)</option>
+                        <option value="SSO">SSO (S&P 500 2배)</option>
+                        <option value="SPXL">SPXL (S&P 500 3배)</option>
+                        <option disabled>──────────</option>
+                        <option value="QQQ">QQQ (나스닥 1배)</option>
+                        <option value="QLD">QLD (나스닥 2배)</option>
+                        <option value="TQQQ">TQQQ (나스닥 3배)</option>
+                        <option disabled>──────────</option>
+                        <option value="__custom__">✏️ 직접 입력...</option>
+                    </select>
+                    <div id="customTickerArea" class="custom-ticker-area hidden">
+                        <div class="custom-ticker-row">
+                            <input type="text" id="customTickerInput" placeholder="티커 심볼 (예: AAPL, MSFT)">
+                            <button type="button" id="fetchTickerBtn">📥 데이터 불러오기</button>
+                        </div>
+                        <p class="custom-ticker-hint">💡 <code>stock_data/</code> 폴더에 yfinance CSV 파일을 넣어두면 자동으로 불러옵니다.</p>
+                    </div>
+                    <div class="ticker-date-info" id="tickerDateInfo">📅 데이터 기간: 로딩중...</div>
+                    <div class="ticker-fetch-status hidden" id="tickerFetchStatus"></div>
+                    <div class="csv-download-area hidden" id="csvDownloadArea">
+                        <button type="button" id="downloadCsvBtn" class="download-csv-btn">💾 CSV 파일 다운로드 (stock_data/에 저장용)</button>
+                    </div>
+                    <div class="gh-pages-notice hidden" id="ghPagesNotice">
+                        ⚠️ GitHub Pages에서는 직접 입력 기능을 사용할 수 없습니다.<br>
+                        로컬에서 서버를 열어 사용해주세요.<br>
+                        <span class="notice-detail">VS Code Live Server 또는 <code>python -m http.server</code></span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>시작일 (YYYY-MM-DD)</label>
+                        <input type="text" id="startDate" value="2010-01-01" placeholder="2010-01-01" pattern="\d{4}-\d{2}-\d{2}">
+                    </div>
+                    <div class="form-group">
+                        <label>종료일 (YYYY-MM-DD)</label>
+                        <input type="text" id="endDate" value="2023-12-31" placeholder="2023-12-31" pattern="\d{4}-\d{2}-\d{2}">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>입금 주기</label>
+                        <select id="frequency">
+                            <option value="monthly">매월 (월초)</option>
+                            <option value="weekly">매주 (월요일)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>초기 거치금 ($)</label>
+                        <input type="number" id="initialDeposit" value="10000">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="form-group">
+                        <label>정기 입금액 ($)</label>
+                        <input type="number" id="regularDeposit" value="1000">
+                    </div>
+                    <div class="form-group">
+                        <label>년도별 입금액 설정</label>
+                        <button type="button" id="openYearlySettingBtn" class="secondary-btn">📅 설정하기</button>
+                    </div>
+                </div>
+
+                <!-- 년도별 입금액 설정 모달 -->
+                <div id="yearlyModal" class="modal hidden">
+                    <div class="modal-content">
+                        <h3>📅 년도별 입금액 설정</h3>
+                        <p class="modal-desc">각 년도의 정기 입금액을 개별 설정할 수 있습니다.</p>
+                        
+                        <div class="auto-increase-section">
+                            <label class="section-label">🔄 자동 증액 (선택)</label>
+                            <div class="auto-increase-row">
+                                <span>매년</span>
+                                <input type="number" id="autoIncreaseRate" value="5" min="0" max="100" class="sm-input-inline">
+                                <span>% 증액</span>
+                                <button type="button" id="applyAutoIncreaseBtn" class="sm-btn">적용</button>
+                            </div>
+                        </div>
+                        
+                        <label class="section-label">📝 개별 설정</label>
+                        <div id="yearlyInputs" class="yearly-inputs"></div>
+                        <div class="modal-buttons">
+                            <button type="button" id="closeModalBtn" class="secondary-btn">닫기</button>
+                            <button type="button" id="saveYearlyBtn">저장</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="startBtn">체험 시작하기</button>
+            </div>
+        </section>
+
+        <!-- 2. 시뮬레이션 화면 -->
+        <section id="simulation-screen" class="hidden">
+            <header>
+                <div class="ticker-badge" id="displayTicker">VOO</div>
+                <div class="date-display" id="simDate">Loading...</div>
+                <div class="controls">
+                    <button id="pauseBtn" class="sm-btn">일시정지</button>
+                    <button id="skipBtn" class="sm-btn">1년 점프</button>
+                </div>
+            </header>
+            
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>날짜 이동</label>
+                    <input type="text" id="jumpDate" placeholder="YYYY-MM-DD" class="sm-input">
+                    <button id="jumpBtn" class="sm-btn">이동</button>
+                </div>
+                <div class="control-group">
+                    <label>속도 (ms)</label>
+                    <input type="number" id="speedInput" value="50" min="0" max="1000" class="sm-input">
+                    <button id="applySpeedBtn" class="sm-btn">적용</button>
+                </div>
+                <div class="keyboard-hint">💡 일시정지 후 ← → 키로 하루씩 이동 가능</div>
+            </div>
+
+            <div class="dashboard">
+                <div class="stat-card">
+                    <h3>총 자산 평가액</h3>
+                    <div class="value main-value" id="totalValue">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>수익률</h3>
+                    <div class="value" id="returnRate">0.00%</div>
+                </div>
+                <div class="stat-card">
+                    <h3>보유 수량</h3>
+                    <div class="value sub-text" id="totalShares">0주</div>
+                </div>
+                <div class="stat-card">
+                    <h3>원금 투입액</h3>
+                    <div class="value sub-text" id="totalInvested">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>💎 누적 배당금 (재투자됨)</h3>
+                    <div class="value sub-text plus" id="totalDividends">$0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>순수익</h3>
+                    <div class="value sub-text" id="profitLoss">$0</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="assetChart"></canvas>
+            </div>
+
+            <div class="log-container">
+                <h3>📜 투자 기록 (배당, 분할, 매수)</h3>
+                <ul id="logList"></ul>
+            </div>
+            
+            <button id="resetBtn" class="secondary-btn">설정으로 돌아가기</button>
+        </section>
+    </div>
+
+    <script src="script.js?v=5"></script>
+</body>
+</html>
